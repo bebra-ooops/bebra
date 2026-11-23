@@ -57,3 +57,149 @@ allowed_set;
 результат.
 
 # Код программы
+Файл variant5_mod.py (пользовательский модуль)
+
+```
+""""
+Модуль маршрутизации и декодирования кадров Modbus/PLC.
+"""
+
+def parse_frame(frame_list):
+    """
+    Извлекает адрес, код функции и данные из кадра.
+    """
+    if len(frame_list) < 4:
+        raise ValueError("Кадр слишком короткий.")
+
+    slave_id = frame_list[0]
+    function_code = frame_list[1:2]
+    data_bytes = frame_list[2:-2]
+
+    return slave_id, function_code, data_bytes
+
+
+def filter_known_slaves(slave_id, allowed_set):
+    """
+    Проверяет, есть ли адрес в разрешённом множестве.
+    """
+    return slave_id in allowed_set
+
+def format_telemetry_dict(device_id, reg_dict):
+    """
+    Формирует словарь телеметрии.
+    """
+    return {
+        "device_id": device_id,
+        "registers": reg_dict,
+        "status": "OK" if reg_dict else "NO_DATA"
+    }
+
+if __name__ == '__main__':
+    print(" АВТОНОМНЫЙ ТЕСТ МОДУЛЯ ")
+    test_frame = [5, 3, 0, 100, 0, 2, 180, 22]
+    allowed = {1, 3, 5, 12}
+
+    addr, func, data = parse_frame(test_frame)
+    print(f"Адрес={addr}, Функция={func}, Данные={data}")
+    print(f"Разрешён: {filter_known_slaves(addr, allowed)}")
+ ```
+
+Файл variant5_main.py (главный скрипт)
+
+```
+import sys
+
+#Импортируем наши функции из первого файла (variant4_mod.py)
+from variant4_mod import filter_known_slaves, format_telemetry_dict, parse_frame
+
+
+def main():
+    # Чтение настроек из sys.argv (аргументов командной строки)
+    if len(sys.argv) > 1:
+        try:
+            device_id = int(sys.argv[1])
+        except ValueError:
+            print("Ошибка: ID устройства должен быть числом. Используем 5 по умолчанию.")
+            device_id = 5
+    else:
+        device_id = 5
+
+    # Множество разрешенных адресов (для проверки)
+    allowed_slaves = {1, 3, 5, 12}
+
+    # Формируем тестовые данные (кадр Modbus)
+    raw_frame = [device_id, 3, 0, 100, 0, 2, 180, 22]
+    
+    print(" СВОДНЫЙ ОТЧЕТ СИСТЕМЫ ТЕЛЕМЕТРИИ ")
+    print(f"Запущен скрипт: {sys.argv[0]}")
+    print(f"Анализируемый кадр: {raw_frame}")
+
+    # Вызываем функции из модуля
+    try:
+        # Извлекаем данные
+        addr, func, data = parse_frame(raw_frame)
+        
+        # Проверяем, разрешен ли адрес
+        is_allowed = filter_known_slaves(addr, allowed_slaves)
+        
+        # Формируем словарь телеметрии
+        telemetry = format_telemetry_dict(addr, data)
+        
+        # Выводим результат
+        print("\n РЕЗУЛЬТАТ ДЕКОДИРОВАНИЯ ")
+        print(f"Адрес устройства: {addr}")
+        print(f"Код функции: {func}")
+        print(f"Данные: {data}")
+        
+        if is_allowed:
+            print("Статус адреса: РАЗРЕШЕН (устройство в белом списке)")
+        else:
+            print("Статус адреса: ЗАПРЕЩЕН (неизвестное устройство!)")
+            
+        print("\n СЛОВАРЬ ТЕЛЕМЕТРИИ ")
+        for key, value in telemetry.items():
+            print(f"  {key}: {value}")
+            
+        # Демонстрация среза: берем первые 2 байта данных
+        print(f"\nПервые 2 байта данных (срез): {data[:2]}")
+        
+    except ValueError as e:
+        print(f"\n ОШИБКА: {e}")
+
+if __name__ == '__main__':
+    main()
+    
+```
+    
+# Результат работы программы
+
+```
+  СВОДНЫЙ ОТЧЕТ СИСТЕМЫ ТЕЛЕМЕТРИИ 
+Запущен скрипт: c:\Users\Student\Desktop\main4.py
+Анализируемый кадр: [5, 3, 0, 100, 0, 2, 180, 22]
+
+ РЕЗУЛЬТАТ ДЕКОДИРОВАНИЯ 
+Адрес устройства: 5
+Код функции: [3]
+Данные: [0, 100, 0, 2]
+Статус адреса: РАЗРЕШЕН (устройство в белом списке)
+
+ СЛОВАРЬ ТЕЛЕМЕТРИИ 
+  device_id: 5
+  registers: [0, 100, 0, 2]
+  status: OK
+
+Первые 2 байта данных (срез): [0, 100]
+```
+# Заключение    
+В ходе выполнения лабораторной работы были изучены принципы модульного программирования в Python. Программа была разделена на два файла: модуль с функциями обработки данных (variant4_mod.py) и главный исполняемый скрипт (main4.py).
+
+Были успешно применены:
+
+Системный модуль sys для чтения аргументов командной строки (sys.argv) с обработкой исключений (fallback).
+
+Базовые структуры данных: списки (для кадра), множества (для белого списка адресов) и словари (для формирования отчета телеметрии).
+
+Синтаксис срезов ([1:2], [2:-2], [:2]) для извлечения полезной нагрузки из кадра Modbus.
+
+Механизм if __name__ == '__main__': для разделения автономного тестирования и основного функционала.
